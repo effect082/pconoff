@@ -3,13 +3,13 @@
 /* We use Inter as a fallback and standard font, but try to use a local or web 'Paperlogy' if available */
 @font-face {
     font-family: 'Paperlogy';
-    src: url('https://cdn.jsdelivr.net/gh/projectnoonnu/noonfonts_2408-3@1.0/Paperlogy-Regular.woff2') format('woff2');
+    src: url('https://cdn.jsdelivr.net/gh/projectnoonnu/2408-3@1.0/Paperlogy-4Regular.woff2') format('woff2');
     font-weight: 400;
     font-style: normal;
 }
 @font-face {
     font-family: 'Paperlogy';
-    src: url('https://cdn.jsdelivr.net/gh/projectnoonnu/noonfonts_2408-3@1.0/Paperlogy-Bold.woff2') format('woff2');
+    src: url('https://cdn.jsdelivr.net/gh/projectnoonnu/2408-3@1.0/Paperlogy-7Bold.woff2') format('woff2');
     font-weight: 700;
     font-style: normal;
 }

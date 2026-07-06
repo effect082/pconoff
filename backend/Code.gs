@@ -45,8 +45,7 @@ function handleRequest(e, method) {
   };
 
   try {
-    const action = e.parameter.action;
-    let params = e.parameter;
+    let params = e.parameter || {};
     
     // For POST requests with JSON payload
     if (e.postData && e.postData.contents) {
@@ -58,6 +57,7 @@ function handleRequest(e, method) {
       }
     }
 
+    const action = params.action;
     let result = { success: false, message: "Invalid action" };
 
     switch (action) {
