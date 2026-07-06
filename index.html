@@ -25,22 +25,21 @@
 
         <!-- Login Form -->
         <div id="loginForm">
-            <div class="form-group mb-4 text-center">
-                <label>
-                    <input type="checkbox" id="chkAdmin"> 관리자 로그인
-                </label>
+            <div class="nav-tabs" style="margin-bottom: 1.5rem; justify-content: center;">
+                <div class="nav-item active" id="navEmp" onclick="switchLoginTab('employee')">직원 로그인</div>
+                <div class="nav-item" id="navAdm" onclick="switchLoginTab('admin')">관리자 로그인</div>
             </div>
 
-            <div class="form-group">
-                <label for="dept">부서</label>
-                <select id="dept" class="form-control">
-                    <option value="">선택하세요</option>
-                    <option value="영업부">영업부</option>
-                    <option value="개발부">개발부</option>
-                    <option value="기획부">기획부</option>
-                    <option value="인사부">인사부</option>
-                    <option value="admin">관리자 (admin)</option>
-                </select>
+            <div id="employeeFields">
+                <div class="form-group">
+                    <label for="dept">부서</label>
+                    <input type="text" id="dept" class="form-control" placeholder="직접 입력 (예: 영업부)">
+                </div>
+
+                <div class="form-group">
+                    <label for="name">이름</label>
+                    <input type="text" id="name" class="form-control" placeholder="이름을 입력하세요">
+                </div>
             </div>
 
             <div class="form-group">
@@ -64,13 +63,7 @@
         <div id="registerForm" style="display: none;">
             <div class="form-group">
                 <label for="regDept">부서</label>
-                <select id="regDept" class="form-control">
-                    <option value="">선택하세요</option>
-                    <option value="영업부">영업부</option>
-                    <option value="개발부">개발부</option>
-                    <option value="기획부">기획부</option>
-                    <option value="인사부">인사부</option>
-                </select>
+                <input type="text" id="regDept" class="form-control" placeholder="직접 입력 (예: 영업부)">
             </div>
 
             <div class="form-group">
@@ -143,11 +136,30 @@
                 loginForm.style.display = 'block';
             });
 
+            let currentTab = 'employee';
+            window.switchLoginTab = function(tab) {
+                currentTab = tab;
+                document.getElementById('navEmp').classList.toggle('active', tab === 'employee');
+                document.getElementById('navAdm').classList.toggle('active', tab === 'admin');
+                document.getElementById('employeeFields').style.display = tab === 'employee' ? 'block' : 'none';
+                document.getElementById('linkRegister').parentElement.style.display = tab === 'employee' ? 'block' : 'none';
+            };
+
             document.getElementById('btnLogin').addEventListener('click', async () => {
-                const dept = document.getElementById('dept').value;
-                const name = document.getElementById('name').value.trim();
+                let dept = '';
+                let name = '';
+                let isAdmin = false;
+
+                if (currentTab === 'employee') {
+                    dept = document.getElementById('dept').value.trim();
+                    name = document.getElementById('name').value.trim();
+                } else {
+                    dept = 'admin';
+                    name = 'admin';
+                    isAdmin = true;
+                }
+                
                 const pwd = document.getElementById('password').value;
-                const isAdmin = document.getElementById('chkAdmin').checked;
 
                 if (!dept || !name || !pwd) {
                     App.showMessage('모든 필드를 입력하세요.', 'text-error');

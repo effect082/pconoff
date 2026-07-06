@@ -134,7 +134,7 @@ function handleLogin(params) {
   const { dept, name, passwordHash, isAdmin } = params;
   if (isAdmin === 'true' || isAdmin === true) {
     // Basic hardcoded admin check for now or specific admin config
-    if (dept === "admin" && passwordHash === "8c6976e5b5410415bde908bd4dee15dfb167a9c873fc4bb8a81f6f2ab448a918") { // "admin" hash
+    if (dept === "admin" && passwordHash === "9af15b336e6a9619928537df30b2e6a2376569fcf9d7e773eccede65606529a0") { // "0000" hash
       return { success: true, message: "Admin Login successful", role: "admin" };
     }
     return { success: false, message: "Invalid Admin Credentials" };
