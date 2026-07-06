@@ -24,6 +24,8 @@ function initSheets() {
     settingsSheet.appendRow(["SettingKey", "SettingValue"]);
     settingsSheet.appendRow(["AlertTime", "18:00"]);
     settingsSheet.appendRow(["AlertMessage", "정규 업무 시간이 종료되었습니다. 시간외근무 미신청자는 신속히 퇴근하시기 바랍니다."]);
+    // Hash of "1234" is 03ac674216f3e15c761ee1a5e255f067953623c8b388b4459e13f978d7c846f4
+    settingsSheet.appendRow(["AdminPasswordHash", "03ac674216f3e15c761ee1a5e255f067953623c8b388b4459e13f978d7c846f4"]);
     settingsSheet.getRange("A1:B1").setFontWeight("bold");
   }
 }
@@ -96,6 +98,9 @@ function handleRequest(e, method) {
       case 'updateSettings':
         result = handleUpdateSettings(params);
         break;
+      case 'updateAdminPassword':
+        result = handleUpdateAdminPassword(params);
+        break;
       default:
         result = { success: false, message: `Unknown action: ${action}` };
     }
@@ -133,8 +138,18 @@ function handleRegister(params) {
 function handleLogin(params) {
   const { dept, name, passwordHash, isAdmin } = params;
   if (isAdmin === 'true' || isAdmin === true) {
-    // Basic hardcoded admin check for now or specific admin config
-    if (dept === "admin" && passwordHash === "9af15b336e6a9619928537df30b2e6a2376569fcf9d7e773eccede65606529a0") { // "0000" hash
+    const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("AdminSettings");
+    const data = sheet.getDataRange().getValues();
+    let currentAdminHash = "03ac674216f3e15c761ee1a5e255f067953623c8b388b4459e13f978d7c846f4"; // Default 1234
+    
+    for (let i = 1; i < data.length; i++) {
+        if (data[i][0] === "AdminPasswordHash") {
+            currentAdminHash = data[i][1];
+            break;
+        }
+    }
+
+    if (passwordHash === currentAdminHash) {
       return { success: true, message: "Admin Login successful", role: "admin" };
     }
     return { success: false, message: "Invalid Admin Credentials" };
@@ -309,4 +324,21 @@ function handleUpdateSettings(params) {
     }
     sheet.appendRow([key, value]);
     return { success: true, message: "Setting added" };
+}
+
+function handleUpdateAdminPassword(params) {
+    const { newPasswordHash } = params;
+    if(!newPasswordHash) return { success: false, message: "Missing hash" };
+    
+    const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("AdminSettings");
+    const data = sheet.getDataRange().getValues();
+    for (let i = 1; i < data.length; i++) {
+        if (data[i][0] === "AdminPasswordHash") {
+            sheet.getRange(i + 1, 2).setValue(newPasswordHash);
+            return { success: true, message: "Admin password updated" };
+        }
+    }
+    // If not exists
+    sheet.appendRow(["AdminPasswordHash", newPasswordHash]);
+    return { success: true, message: "Admin password created" };
 }

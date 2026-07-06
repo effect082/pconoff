@@ -87,7 +87,32 @@
 
         <!-- Settings Tab -->
         <div id="settings-tab" class="tab-pane">
-            <h2 class="mb-4">퇴근 독려 설정</h2>
+            <h2 class="mb-4">서버 및 시스템 설정</h2>
+            
+            <h3 class="mb-3">1. 서버 연결 설정 (GAS URL)</h3>
+            <div class="form-group">
+                <input type="text" id="adminGasUrl" class="form-control" placeholder="https://script.google.com/macros/s/.../exec">
+                <button class="btn btn-primary mt-2" id="btnSaveAdminUrl">URL 저장 및 연동</button>
+            </div>
+            <div class="form-group mt-3">
+                <label>직원용 초대 링크 (URL 저장 후 생성됨)</label>
+                <div style="display: flex; gap: 0.5rem;">
+                    <input type="text" id="inviteLink" class="form-control" readonly placeholder="저장하면 링크가 생성됩니다.">
+                    <button class="btn" id="btnCopyInvite" style="background: white; white-space: nowrap;">복사</button>
+                </div>
+                <small class="text-muted block mt-2">이 링크를 직원들에게 공유하면 서버 주소가 자동으로 설정됩니다.</small>
+            </div>
+            <hr class="my-4">
+
+            <h3 class="mb-3">2. 관리자 비밀번호 변경</h3>
+            <div class="form-group">
+                <label>새 관리자 비밀번호 (숫자 4자리)</label>
+                <input type="password" id="newAdminPwd" class="form-control" maxlength="4" placeholder="****">
+                <button class="btn btn-primary mt-2" id="btnUpdateAdminPwd">비밀번호 변경</button>
+            </div>
+            <hr class="my-4">
+
+            <h3 class="mb-3">3. 퇴근 독려 알림 설정</h3>
             <div class="form-group">
                 <label>알림 기준 시간</label>
                 <input type="time" id="alertTime" class="form-control" style="max-width: 200px;">
@@ -131,6 +156,10 @@
         document.getElementById('filterDate').value = getToday();
 
         async function loadLogs() {
+            if (!App.getGasUrl()) {
+                document.querySelector('#logsTable tbody').innerHTML = '<tr><td colspan="5" class="text-center text-error">서버가 연동되지 않았습니다. 설정 탭에서 서버를 연결하세요.</td></tr>';
+                return;
+            }
             const date = document.getElementById('filterDate').value;
             const filterName = document.getElementById('filterName').value.trim();
             document.getElementById('reportTitle').innerText = `[${date}] 전체 PC 접속시간 현황 보고서`;
@@ -171,6 +200,10 @@
 
         async function loadUsers() {
             const tbody = document.querySelector('#usersTable tbody');
+            if (!App.getGasUrl()) {
+                tbody.innerHTML = '<tr><td colspan="5" class="text-center text-error">서버가 연동되지 않았습니다.</td></tr>';
+                return;
+            }
             tbody.innerHTML = '<tr><td colspan="5" class="text-center">로딩 중...</td></tr>';
 
             const res = await App.apiCall({ action: 'getUsers' });
@@ -214,15 +247,60 @@
         }
 
         async function loadSettings() {
-            const res = await App.apiCall({ action: 'getSettings' });
-            if(res && res.success) {
-                document.getElementById('alertTime').value = res.data.AlertTime || '18:00';
-                document.getElementById('alertMessage').value = res.data.AlertMessage || '정규 업무 시간이 종료되었습니다.';
+            const url = App.getGasUrl();
+            if (url) {
+                document.getElementById('adminGasUrl').value = url;
+                document.getElementById('inviteLink').value = window.location.origin + window.location.pathname.replace('admin.html', '') + '?gasUrl=' + encodeURIComponent(url);
+                
+                const res = await App.apiCall({ action: 'getSettings' });
+                if(res && res.success) {
+                    document.getElementById('alertTime').value = res.data.AlertTime || '18:00';
+                    document.getElementById('alertMessage').value = res.data.AlertMessage || '정규 업무 시간이 종료되었습니다.';
+                }
             }
         }
 
         document.getElementById('btnSearchLogs').addEventListener('click', loadLogs);
         
+        document.getElementById('btnSaveAdminUrl').addEventListener('click', async () => {
+            const url = document.getElementById('adminGasUrl').value.trim();
+            if (!url) { alert('URL을 입력하세요.'); return; }
+            App.setGasUrl(url);
+            document.getElementById('inviteLink').value = window.location.origin + window.location.pathname.replace('admin.html', '') + '?gasUrl=' + encodeURIComponent(url);
+            
+            const res = await App.apiCall({ action: 'init' });
+            if (res && res.success) {
+                alert('서버 연동 성공! 초기화가 완료되었습니다.');
+                loadLogs();
+            } else {
+                alert('URL을 확인해주세요. 연동에 실패했습니다.');
+                localStorage.removeItem('gasUrl');
+            }
+        });
+
+        document.getElementById('btnCopyInvite').addEventListener('click', () => {
+            const link = document.getElementById('inviteLink');
+            if (link.value) {
+                link.select();
+                document.execCommand('copy');
+                alert('초대 링크가 복사되었습니다!');
+            }
+        });
+
+        document.getElementById('btnUpdateAdminPwd').addEventListener('click', async () => {
+            if (!App.getGasUrl()) { alert('서버를 먼저 연결하세요.'); return; }
+            const pwd = document.getElementById('newAdminPwd').value;
+            if (!pwd || !/^\d{4}$/.test(pwd)) { alert('숫자 4자리를 입력하세요.'); return; }
+            const hash = await window.sha256(pwd);
+            const res = await App.apiCall({ action: 'updateAdminPassword', newPasswordHash: hash });
+            if (res && res.success) {
+                alert('관리자 비밀번호가 성공적으로 변경되었습니다.');
+                document.getElementById('newAdminPwd').value = '';
+            } else {
+                alert('비밀번호 변경에 실패했습니다.');
+            }
+        });
+
         document.getElementById('btnSaveSettings').addEventListener('click', async () => {
             const time = document.getElementById('alertTime').value;
             const msg = document.getElementById('alertMessage').value;

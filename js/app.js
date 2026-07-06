@@ -10,8 +10,18 @@ const App = {
     showMessage: (msg, className) => {
         const statusEl = document.getElementById('statusMessage');
         if (statusEl) {
-            statusEl.textContent = msg;
-            statusEl.className = `text-center mt-4 ${className}`;
+            statusEl.className = 'text-center mt-4 ' + className;
+            statusEl.innerText = msg;
+        }
+    },
+
+    initApp: () => {
+        const urlParams = new URLSearchParams(window.location.search);
+        const urlGas = urlParams.get('gasUrl');
+        if (urlGas) {
+            App.setGasUrl(urlGas);
+            // remove it from url cleanly
+            window.history.replaceState({}, document.title, window.location.pathname);
         }
     },
 

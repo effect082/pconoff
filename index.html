@@ -13,16 +13,6 @@
             <p class="text-muted">출퇴근 관리를 위해 로그인해주세요.</p>
         </div>
 
-        <!-- GAS URL Setup Form (Hidden if already set) -->
-        <div id="setupForm" style="display: none;">
-            <div class="form-group">
-                <label for="gasUrl">Google Apps Script URL</label>
-                <input type="text" id="gasUrl" class="form-control" placeholder="https://script.google.com/macros/s/.../exec">
-                <small class="text-muted mt-2 block">최초 1회 설정이 필요합니다.</small>
-            </div>
-            <button id="btnSaveUrl" class="btn btn-primary btn-block">저장 및 초기화</button>
-        </div>
-
         <!-- Login Form -->
         <div id="loginForm">
             <div class="nav-tabs" style="margin-bottom: 1.5rem; justify-content: center;">
@@ -41,10 +31,12 @@
                     <input type="text" id="name" class="form-control" placeholder="이름을 입력하세요">
                 </div>
             </div>
-
-            <div class="form-group">
-                <label for="name">이름</label>
-                <input type="text" id="name" class="form-control" placeholder="이름을 입력하세요">
+            
+            <div id="adminFields" style="display: none;">
+                <div class="form-group">
+                    <label>관리자 아이디</label>
+                    <input type="text" id="adminId" class="form-control" value="admin" readonly>
+                </div>
             </div>
 
             <div class="form-group">
@@ -96,36 +88,22 @@
     <script>
         // Page specific logic
         document.addEventListener('DOMContentLoaded', () => {
-            const setupForm = document.getElementById('setupForm');
+            App.initApp(); // URL에서 gasUrl 가져오기 처리
+
             const loginForm = document.getElementById('loginForm');
             const registerForm = document.getElementById('registerForm');
             
             // Check if GAS URL is set
             if (!App.getGasUrl()) {
-                setupForm.style.display = 'block';
-                loginForm.style.display = 'none';
+                App.showMessage('서버 주소가 없습니다. 관리자 로그인을 통해 서버를 연동하세요.', 'text-error');
             }
-
-            document.getElementById('btnSaveUrl').addEventListener('click', async () => {
-                const url = document.getElementById('gasUrl').value.trim();
-                if (url) {
-                    App.setGasUrl(url);
-                    App.showMessage('URL 저장 중...', 'text-muted');
-                    // Try to initialize sheets
-                    const res = await App.apiCall({ action: 'init' });
-                    if (res && res.success) {
-                        App.showMessage('초기화 완료. 로그인해주세요.', 'text-success');
-                        setupForm.style.display = 'none';
-                        loginForm.style.display = 'block';
-                    } else {
-                        App.showMessage('URL 확인 필요 또는 서버 오류.', 'text-error');
-                        localStorage.removeItem('gasUrl');
-                    }
-                }
-            });
 
             document.getElementById('linkRegister').addEventListener('click', (e) => {
                 e.preventDefault();
+                if (!App.getGasUrl()) {
+                    App.showMessage('서버 주소가 설정되지 않아 등록할 수 없습니다.', 'text-error');
+                    return;
+                }
                 loginForm.style.display = 'none';
                 registerForm.style.display = 'block';
             });
@@ -142,7 +120,16 @@
                 document.getElementById('navEmp').classList.toggle('active', tab === 'employee');
                 document.getElementById('navAdm').classList.toggle('active', tab === 'admin');
                 document.getElementById('employeeFields').style.display = tab === 'employee' ? 'block' : 'none';
+                document.getElementById('adminFields').style.display = tab === 'admin' ? 'block' : 'none';
                 document.getElementById('linkRegister').parentElement.style.display = tab === 'employee' ? 'block' : 'none';
+                
+                if (tab === 'employee' && !App.getGasUrl()) {
+                    App.showMessage('서버 주소가 없습니다. 관리자가 보낸 링크로 접속하세요.', 'text-error');
+                } else if (tab === 'admin' && !App.getGasUrl()) {
+                    App.showMessage('관리자 로그인 후 서버 주소를 설정하세요.', 'text-muted');
+                } else {
+                    App.showMessage('', '');
+                }
             };
 
             document.getElementById('btnLogin').addEventListener('click', async () => {
@@ -151,11 +138,15 @@
                 let isAdmin = false;
 
                 if (currentTab === 'employee') {
+                    if (!App.getGasUrl()) {
+                        App.showMessage('서버 주소가 설정되지 않았습니다.', 'text-error');
+                        return;
+                    }
                     dept = document.getElementById('dept').value.trim();
                     name = document.getElementById('name').value.trim();
                 } else {
                     dept = 'admin';
-                    name = 'admin';
+                    name = document.getElementById('adminId').value.trim();
                     isAdmin = true;
                 }
                 
@@ -167,6 +158,19 @@
                 }
 
                 const hash = await window.sha256(pwd);
+                
+                // Local admin bypass if GAS URL is missing
+                if (isAdmin && !App.getGasUrl()) {
+                    if (hash === "03ac674216f3e15c761ee1a5e255f067953623c8b388b4459e13f978d7c846f4") {
+                        App.showMessage('오프라인 관리자 로그인 성공', 'text-success');
+                        sessionStorage.setItem('isAdmin', 'true');
+                        window.location.href = 'admin.html';
+                    } else {
+                        App.showMessage('초기 관리자 비밀번호가 틀렸습니다.', 'text-error');
+                    }
+                    return;
+                }
+
                 App.showMessage('로그인 중...', 'text-muted');
                 
                 const res = await App.apiCall({
