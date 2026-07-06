@@ -309,7 +309,14 @@ function handleGetSettings() {
     const data = sheet.getDataRange().getValues();
     let settings = {};
     for (let i = 1; i < data.length; i++) {
-        settings[data[i][0]] = data[i][1];
+        let val = data[i][1];
+        // 구글 시트에서 시간이 Date 객체로 반환될 경우 포맷팅
+        if (val instanceof Date) {
+            let hours = val.getHours().toString().padStart(2, '0');
+            let mins = val.getMinutes().toString().padStart(2, '0');
+            val = `${hours}:${mins}`;
+        }
+        settings[data[i][0]] = val;
     }
     return { success: true, data: settings };
 }

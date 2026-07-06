@@ -254,7 +254,17 @@
                 
                 const res = await App.apiCall({ action: 'getSettings' });
                 if(res && res.success) {
-                    document.getElementById('alertTime').value = res.data.AlertTime || '18:00';
+                    let timeStr = res.data.AlertTime || '18:00';
+                    // 구글 시트에서 날짜형 객체로 반환되어 ISO 문자열이 넘어온 경우 시간만 추출
+                    if (timeStr.includes('T')) {
+                        const dateObj = new Date(timeStr);
+                        if (!isNaN(dateObj.getTime())) {
+                            const hours = String(dateObj.getHours()).padStart(2, '0');
+                            const mins = String(dateObj.getMinutes()).padStart(2, '0');
+                            timeStr = `${hours}:${mins}`;
+                        }
+                    }
+                    document.getElementById('alertTime').value = timeStr;
                     document.getElementById('alertMessage').value = res.data.AlertMessage || '정규 업무 시간이 종료되었습니다.';
                 }
             }
@@ -305,11 +315,19 @@
             const time = document.getElementById('alertTime').value;
             const msg = document.getElementById('alertMessage').value;
             
-            await App.apiCall({ action: 'updateSettings', key: 'AlertTime', value: time });
-            await App.apiCall({ action: 'updateSettings', key: 'AlertMessage', value: msg });
+            document.getElementById('settingsMsg').innerText = '저장 중...';
+            document.getElementById('settingsMsg').className = 'text-muted mt-2';
+
+            const res1 = await App.apiCall({ action: 'updateSettings', key: 'AlertTime', value: time });
+            const res2 = await App.apiCall({ action: 'updateSettings', key: 'AlertMessage', value: msg });
             
-            document.getElementById('settingsMsg').innerText = '설정이 저장되었습니다.';
-            document.getElementById('settingsMsg').className = 'text-success mt-2';
+            if (res1 && res1.success && res2 && res2.success) {
+                document.getElementById('settingsMsg').innerText = '설정이 저장되었습니다.';
+                document.getElementById('settingsMsg').className = 'text-success mt-2';
+            } else {
+                document.getElementById('settingsMsg').innerText = '설정 저장 중 서버 오류가 발생했습니다.';
+                document.getElementById('settingsMsg').className = 'text-error mt-2';
+            }
             setTimeout(() => { document.getElementById('settingsMsg').innerText = ''; }, 3000);
         });
 
