@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>관리자 대시보드 - PC ON/OFF 모니터링</title>
+    <link rel="stylesheet" href="css/style.css">
+    <style>
+        .filter-bar {
+            display: flex;
+            gap: 1rem;
+            margin-bottom: 1rem;
+            align-items: center;
+            background: rgba(255,255,255,0.4);
+            padding: 1rem;
+            border-radius: 8px;
+        }
+        .filter-bar input {
+            width: auto;
+        }
+    </style>
+</head>
+<body>
+    <div class="container glass-panel mt-4 mb-4" style="flex: 1;">
+        <div class="header">
+            <h1>관리자 대시보드</h1>
+            <div class="header-actions">
+                <button class="btn btn-primary" onclick="App.logout()">로그아웃</button>
+            </div>
+        </div>
+
+        <div class="nav-tabs">
+            <div class="nav-item active" onclick="switchTab('attendance')">근태 현황</div>
+            <div class="nav-item" onclick="switchTab('members')">회원 관리</div>
+            <div class="nav-item" onclick="switchTab('settings')">설정 (퇴근 독려)</div>
+        </div>
+
+        <!-- Attendance Tab -->
+        <div id="attendance-tab" class="tab-pane active">
+            <h2 id="reportTitle" class="mb-4">전체 PC 접속시간 현황 보고서</h2>
+            
+            <div class="filter-bar">
+                <input type="date" id="filterDate" class="form-control">
+                <input type="text" id="filterName" class="form-control" placeholder="직원 검색 (이름)">
+                <button class="btn btn-primary" id="btnSearchLogs">조회</button>
+                <button class="btn" style="background: white; margin-left: auto;" onclick="window.print()">보고서 인쇄</button>
+            </div>
+
+            <div class="table-container">
+                <table id="logsTable">
+                    <thead>
+                        <tr>
+                            <th>날짜</th>
+                            <th>부서</th>
+                            <th>이름</th>
+                            <th>출근(PC 켠 시간)</th>
+                            <th>퇴근(PC 끈 시간)</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <!-- Data will be populated here -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Members Tab -->
+        <div id="members-tab" class="tab-pane">
+            <h2 class="mb-4">회원 관리</h2>
+            <div class="table-container">
+                <table id="usersTable">
+                    <thead>
+                        <tr>
+                            <th>부서</th>
+                            <th>이름</th>
+                            <th>직급</th>
+                            <th>상태</th>
+                            <th>관리</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <!-- Data will be populated here -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Settings Tab -->
+        <div id="settings-tab" class="tab-pane">
+            <h2 class="mb-4">퇴근 독려 설정</h2>
+            <div class="form-group">
+                <label>알림 기준 시간</label>
+                <input type="time" id="alertTime" class="form-control" style="max-width: 200px;">
+                <small class="text-muted block mt-2">이 시간 이후에 시간외근무를 신청하지 않은(여기선 기본 퇴근) 직원에게 알림이 갑니다.</small>
+            </div>
+            <div class="form-group">
+                <label>안내문 텍스트</label>
+                <textarea id="alertMessage" class="form-control" rows="3"></textarea>
+            </div>
+            <button class="btn btn-primary" id="btnSaveSettings">설정 저장</button>
+            <div id="settingsMsg" class="mt-2"></div>
+        </div>
+    </div>
+
+    <script src="js/crypto.js"></script>
+    <script src="js/app.js"></script>
+    <script>
+        if (sessionStorage.getItem('isAdmin') !== 'true') {
+            window.location.href = 'index.html';
+        }
+
+        function switchTab(tabId) {
+            document.querySelectorAll('.tab-pane').forEach(el => el.classList.remove('active'));
+            document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+            document.getElementById(`${tabId}-tab`).classList.add('active');
+            event.target.classList.add('active');
+            
+            if (tabId === 'attendance') loadLogs();
+            if (tabId === 'members') loadUsers();
+            if (tabId === 'settings') loadSettings();
+        }
+
+        function getToday() {
+            const today = new Date();
+            const yyyy = today.getFullYear();
+            const mm = String(today.getMonth() + 1).padStart(2, '0');
+            const dd = String(today.getDate()).padStart(2, '0');
+            return `${yyyy}-${mm}-${dd}`;
+        }
+
+        document.getElementById('filterDate').value = getToday();
+
+        async function loadLogs() {
+            const date = document.getElementById('filterDate').value;
+            const filterName = document.getElementById('filterName').value.trim();
+            document.getElementById('reportTitle').innerText = `[${date}] 전체 PC 접속시간 현황 보고서`;
+            
+            const tbody = document.querySelector('#logsTable tbody');
+            tbody.innerHTML = '<tr><td colspan="5" class="text-center">로딩 중...</td></tr>';
+
+            const res = await App.apiCall({ action: 'getLogs', date });
+            if (res && res.success) {
+                tbody.innerHTML = '';
+                const data = res.data;
+                const filtered = data.filter(r => !filterName || r.Name.includes(filterName));
+                
+                if (filtered.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="5" class="text-center">데이터가 없습니다.</td></tr>';
+                    return;
+                }
+
+                filtered.forEach(row => {
+                    // Date can be complex if GAS returns ISO string, format it safely
+                    let dateStr = row.Date;
+                    if(dateStr.includes('T')) dateStr = dateStr.split('T')[0];
+
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `
+                        <td>${dateStr}</td>
+                        <td>${row.Department}</td>
+                        <td>${row.Name}</td>
+                        <td>${row.BootTime ? String(row.BootTime).replace(/^'/, '') : '-'}</td>
+                        <td>${row.OffTime ? String(row.OffTime).replace(/^'/, '') : '-'}</td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+            } else {
+                tbody.innerHTML = '<tr><td colspan="5" class="text-center text-error">불러오기 실패</td></tr>';
+            }
+        }
+
+        async function loadUsers() {
+            const tbody = document.querySelector('#usersTable tbody');
+            tbody.innerHTML = '<tr><td colspan="5" class="text-center">로딩 중...</td></tr>';
+
+            const res = await App.apiCall({ action: 'getUsers' });
+            if (res && res.success) {
+                tbody.innerHTML = '';
+                res.data.forEach(user => {
+                    const tr = document.createElement('tr');
+                    const isActive = user.Status === 'Active';
+                    tr.innerHTML = `
+                        <td>${user.Department}</td>
+                        <td>${user.Name}</td>
+                        <td>${user.Rank}</td>
+                        <td>
+                            <select onchange="updateUserStatus('${user.Department}', '${user.Name}', this.value)" class="form-control" style="padding: 0.25rem; width: auto;">
+                                <option value="Active" ${isActive ? 'selected' : ''}>재직</option>
+                                <option value="Inactive" ${!isActive ? 'selected' : ''}>퇴사</option>
+                            </select>
+                        </td>
+                        <td>
+                            <button class="btn" style="padding: 0.25rem 0.5rem; font-size: 0.875rem; background: white;" onclick="resetPassword('${user.Department}', '${user.Name}')">비밀번호 초기화(0000)</button>
+                        </td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+            }
+        }
+
+        async function updateUserStatus(dept, name, status) {
+            await App.apiCall({ action: 'updateUserStatus', dept, name, status });
+            alert('상태가 변경되었습니다.');
+        }
+
+        async function resetPassword(dept, name) {
+            if(confirm(`${name} 직원의 비밀번호를 '0000'으로 초기화하시겠습니까?`)) {
+                const hash = await window.sha256("0000");
+                const res = await App.apiCall({ action: 'resetPassword', dept, name, newPasswordHash: hash });
+                if (res && res.success) {
+                    alert('초기화되었습니다.');
+                }
+            }
+        }
+
+        async function loadSettings() {
+            const res = await App.apiCall({ action: 'getSettings' });
+            if(res && res.success) {
+                document.getElementById('alertTime').value = res.data.AlertTime || '18:00';
+                document.getElementById('alertMessage').value = res.data.AlertMessage || '정규 업무 시간이 종료되었습니다.';
+            }
+        }
+
+        document.getElementById('btnSearchLogs').addEventListener('click', loadLogs);
+        
+        document.getElementById('btnSaveSettings').addEventListener('click', async () => {
+            const time = document.getElementById('alertTime').value;
+            const msg = document.getElementById('alertMessage').value;
+            
+            await App.apiCall({ action: 'updateSettings', key: 'AlertTime', value: time });
+            await App.apiCall({ action: 'updateSettings', key: 'AlertMessage', value: msg });
+            
+            document.getElementById('settingsMsg').innerText = '설정이 저장되었습니다.';
+            document.getElementById('settingsMsg').className = 'text-success mt-2';
+            setTimeout(() => { document.getElementById('settingsMsg').innerText = ''; }, 3000);
+        });
+
+        // Initial Load
+        loadLogs();
+    </script>
+</body>
+</html>

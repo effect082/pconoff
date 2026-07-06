@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>내 근태 확인 - PC ON/OFF 모니터링</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <div class="container glass-panel mt-4 mb-4" style="flex: 1; max-width: 600px;">
+        <div class="header">
+            <h1>내 근태 기록</h1>
+            <button class="btn" style="background: white;" onclick="App.logout()">로그아웃</button>
+        </div>
+
+        <div id="userInfo" class="mb-4 text-center">
+            <!-- Populated by JS -->
+        </div>
+
+        <div class="form-group flex gap-2 mb-4">
+            <input type="date" id="myDate" class="form-control">
+            <button id="btnCheck" class="btn btn-primary">조회</button>
+        </div>
+
+        <div class="glass-panel" style="padding: 1.5rem; text-align: center;">
+            <div style="margin-bottom: 1.5rem;">
+                <p class="text-muted mb-2">출근 (PC 켠 시간)</p>
+                <h2 id="myBootTime" style="color: var(--primary-color); font-size: 2rem;">--:--:--</h2>
+            </div>
+            <div>
+                <p class="text-muted mb-2">퇴근 (PC 끈 시간)</p>
+                <h2 id="myOffTime" style="color: var(--text-main); font-size: 2rem;">--:--:--</h2>
+            </div>
+        </div>
+        
+        <div id="statusMsg" class="text-center mt-4 text-muted"></div>
+    </div>
+
+    <script src="js/app.js"></script>
+    <script>
+        const userStr = sessionStorage.getItem('user');
+        if (!userStr) {
+            window.location.href = 'index.html';
+        }
+        
+        const user = JSON.parse(userStr);
+        document.getElementById('userInfo').innerHTML = `<strong>${user.dept} ${user.name} ${user.rank}</strong> 님 환영합니다.`;
+
+        function getToday() {
+            const today = new Date();
+            const yyyy = today.getFullYear();
+            const mm = String(today.getMonth() + 1).padStart(2, '0');
+            const dd = String(today.getDate()).padStart(2, '0');
+            return `${yyyy}-${mm}-${dd}`;
+        }
+
+        document.getElementById('myDate').value = getToday();
+
+        async function fetchMyData() {
+            const date = document.getElementById('myDate').value;
+            const msgEl = document.getElementById('statusMsg');
+            msgEl.innerText = '데이터 불러오는 중...';
+
+            document.getElementById('myBootTime').innerText = '--:--:--';
+            document.getElementById('myOffTime').innerText = '--:--:--';
+
+            const res = await App.apiCall({ action: 'getLogs', date });
+            if (res && res.success) {
+                const myLog = res.data.find(r => r.Department === user.dept && r.Name === user.name);
+                if (myLog) {
+                    msgEl.innerText = '업데이트 완료';
+                    if(myLog.BootTime) {
+                        document.getElementById('myBootTime').innerText = String(myLog.BootTime).replace(/^'/, '');
+                    }
+                    if(myLog.OffTime) {
+                        document.getElementById('myOffTime').innerText = String(myLog.OffTime).replace(/^'/, '');
+                    }
+                } else {
+                    msgEl.innerText = '해당 날짜의 기록이 없습니다.';
+                }
+            } else {
+                msgEl.innerText = '오류 발생. 다시 시도해주세요.';
+            }
+        }
+
+        document.getElementById('btnCheck').addEventListener('click', fetchMyData);
+        
+        // Initial fetch
+        fetchMyData();
+    </script>
+</body>
+</html>
